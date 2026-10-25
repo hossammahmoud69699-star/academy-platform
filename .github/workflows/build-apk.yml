@@ -1,12 +1,16 @@
 name: Build Monsatak Android APK
 
 
+
+
 on:
   workflow_dispatch:
   push:
     paths:
       - "apps/student/**"
       - ".github/workflows/build-apk.yml"
+
+
 
 
 jobs:
@@ -56,7 +60,7 @@ jobs:
           set -e
           APK="build/app/outputs/flutter-apk/app-release.apk"
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          zipalign -f 4 "$APK" app-aligned.apk
+          "$BUILD_TOOLS/zipalign" -f 4 "$APK" app-aligned.apk
           "$BUILD_TOOLS/apksigner" sign \
             --ks upload-keystore.jks \
             --ks-key-alias upload \
@@ -81,4 +85,6 @@ jobs:
           path: apps/student/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 7
+
+
 
