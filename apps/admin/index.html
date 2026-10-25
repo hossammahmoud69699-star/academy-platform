@@ -1,203 +1,403 @@
 
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>منصتك - لوحة الإدارة</title>
+  <title>منصتك | لوحة الإدارة</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: Tahoma, Arial, sans-serif;
-      background: #f3f6fc;
-      color: #14213d;
+      background: #f1f5f9;
+      color: #172033;
     }
     header {
       background: #14213d;
-      color: white;
-      padding: 22px;
+      color: #fff;
+      padding: 22px 18px;
     }
-    main {
-      max-width: 850px;
-      margin: 25px auto;
-      padding: 0 15px;
-    }
-    section {
-      background: white;
+    header h1 { margin: 0 0 8px; }
+    header p { margin: 0; color: #cbd5e1; }
+    main { max-width: 1000px; margin: 24px auto; padding: 0 14px; }
+    .card {
+      background: #fff;
       padding: 20px;
       margin-bottom: 18px;
       border-radius: 14px;
       box-shadow: 0 3px 12px #0000000b;
     }
+    h2 { margin-top: 0; font-size: 20px; }
+    label { display: block; margin: 12px 0 6px; }
     input {
       display: block;
-      box-sizing: border-box;
       width: 100%;
       padding: 12px;
-      margin: 10px 0;
-      border: 1px solid #ccd4e0;
+      border: 1px solid #cbd5e1;
       border-radius: 8px;
+      font-size: 15px;
+      background: #fff;
     }
     button {
-      padding: 12px 18px;
       border: 0;
       border-radius: 8px;
-      background: #2457c5;
-      color: white;
+      padding: 12px 16px;
+      margin: 8px 0;
       cursor: pointer;
+      font-size: 15px;
+      background: #2563eb;
+      color: #fff;
     }
-    .hidden { display: none; }
-    .error { color: #b91c1c; }
-    li { padding: 8px; }
+    button.secondary { background: #475569; }
+    button.danger { background: #dc2626; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .status {
+      margin-top: 10px;
+      line-height: 1.8;
+      overflow-wrap: anywhere;
+    }
+    .muted { color: #64748b; font-size: 14px; line-height: 1.8; }
+    .course {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px;
+      margin-top: 12px;
+    }
+    .course h3 { margin: 0 0 8px; }
+    .hidden { display: none !important; }
+    .tag {
+      display: inline-block;
+      background: #dcfce7;
+      color: #166534;
+      padding: 5px 9px;
+      border-radius: 20px;
+      font-size: 13px;
+    }
+    .note {
+      background: #eff6ff;
+      border-right: 4px solid #2563eb;
+      padding: 12px;
+      line-height: 1.8;
+      border-radius: 6px;
+    }
   </style>
 </head>
 <body>
-<header>
-  <h1>منصتك التعليمية</h1>
-  <p>لوحة إدارة المشرف والمدرس</p>
-</header>
+  <header>
+    <h1>🎓 منصتك</h1>
+    <p>لوحة إدارة المنصة التعليمية</p>
+  </header>
 
-<main>
-  <section id="setup">
-    <h2>إعداد الاتصال</h2>
-    <p>أدخل رابط مشروع Supabase والمفتاح العام فقط.</p>
-    <input id="url" placeholder="Project URL">
-    <input id="key" placeholder="Publishable أو anon key">
-    <button onclick="connect()">اتصال</button>
-    <p id="setupMessage" class="error"></p>
-  </section>
+  <main>
+    <section class="card" id="connectionCard">
+      <h2>الاتصال بقاعدة البيانات</h2>
+      <p class="muted">
+        استخدم رابط مشروع Supabase والمفتاح العام Publishable أو anon
+        الخاصين بمشروعك الحالي.
+      </p>
 
-  <section id="login" class="hidden">
-    <h2>تسجيل الدخول</h2>
-    <input id="email" type="email" placeholder="البريد الإلكتروني">
-    <input id="password" type="password" placeholder="كلمة المرور">
-    <button onclick="signIn()">دخول</button>
-    <p id="loginMessage" class="error"></p>
-  </section>
+      <div class="note">
+        لا تضع مفتاح service_role أو أي مفتاح سري هنا.
+        بيانات الاتصال لا يتم حفظها في المتصفح بواسطة هذا الملف.
+      </div>
 
-  <section id="dashboard" class="hidden">
-    <h2 id="welcome">لوحة التحكم</h2>
-    <button onclick="loadCourses()">تحديث الكورسات</button>
-    <button onclick="logout()">تسجيل الخروج</button>
-    <p id="status"></p>
-    <h3>الكورسات المنشورة</h3>
-    <ul id="courses"></ul>
-  </section>
-</main>
+      <label for="projectUrl">رابط مشروع Supabase</label>
+      <input id="projectUrl" type="url"
+        placeholder="https://your-project.supabase.co"
+        autocomplete="url">
 
-<script>
-let db = null;
+      <label for="publicKey">المفتاح العام Publishable / anon</label>
+      <input id="publicKey" type="password"
+        placeholder="أدخل المفتاح العام"
+        autocomplete="off">
 
-function show(id, visible) {
-  document.getElementById(id).classList.toggle(
-    'hidden', !visible
-  );
-}
+      <button id="connectBtn" type="button">الاتصال بقاعدة البيانات</button>
+      <div id="connectionStatus" class="status" role="status"></div>
+    </section>
 
-function connect() {
-  const url = document.getElementById('url').value.trim();
-  const key = document.getElementById('key').value.trim();
+    <section class="card hidden" id="loginCard">
+      <h2>تسجيل دخول الإدارة أو المعلم</h2>
 
-  if (!url.startsWith('https://') || !key) {
-    document.getElementById('setupMessage').textContent =
-      'راجع رابط المشروع والمفتاح العام.';
-    return;
-  }
+      <form id="loginForm">
+        <label for="email">البريد الإلكتروني</label>
+        <input id="email" type="email" required autocomplete="username">
 
-  db = window.supabase.createClient(url, key);
-  show('setup', false);
-  show('login', true);
-}
+        <label for="password">كلمة المرور</label>
+        <input id="password" type="password" required
+          autocomplete="current-password">
 
-async function signIn() {
-  const message = document.getElementById('loginMessage');
-  message.textContent = 'جارٍ تسجيل الدخول...';
+        <button id="loginBtn" type="submit">تسجيل الدخول</button>
+      </form>
 
-  const { error } = await db.auth.signInWithPassword({
-    email: document.getElementById('email').value.trim(),
-    password: document.getElementById('password').value
-  });
+      <div id="loginStatus" class="status" role="status"></div>
+    </section>
 
-  if (error) {
-    message.textContent = error.message;
-    return;
-  }
+    <section class="card hidden" id="dashboard">
+      <h2>لوحة التحكم</h2>
+      <p id="userInfo"></p>
+      <span class="tag" id="roleTag">حساب موثّق</span>
 
-  const { data, error: userError } = await db.auth.getUser();
+      <hr style="border:0;border-top:1px solid #e2e8f0;margin:18px 0">
 
-  if (userError || !data.user) {
-    message.textContent = 'تعذر التحقق من الحساب.';
-    return;
-  }
+      <h2>📚 الكورسات المنشورة</h2>
+      <button id="refreshBtn" type="button">تحديث الكورسات</button>
+      <div id="dashboardStatus" class="status" role="status"></div>
+      <div id="coursesList"></div>
 
-  const { data: profile, error: profileError } = await db
-    .from('profiles')
-    .select('full_name, role, is_active')
-    .eq('id', data.user.id)
-    .maybeSingle();
+      <button id="logoutBtn" class="danger" type="button">تسجيل الخروج</button>
+    </section>
+  </main>
 
-  if (
-    profileError ||
-    !profile ||
-    !['super_admin', 'teacher'].includes(profile.role) ||
-    profile.is_active === false
-  ) {
-    await db.auth.signOut();
-    message.textContent =
-      'الحساب غير مخوّل لدخول لوحة الإدارة.';
-    return;
-  }
+  <script>
+    (() => {
+      "use strict";
 
-  document.getElementById('welcome').textContent =
-    'أهلًا ' + (profile.full_name || 'بك');
+      const $ = id => document.getElementById(id);
 
-  show('login', false);
-  show('dashboard', true);
-  await loadCourses();
-}
+      let supabaseClient = null;
+      let currentUser = null;
 
-async function loadCourses() {
-  const status = document.getElementById('status');
-  const list = document.getElementById('courses');
+      function setStatus(id, message, success = false) {
+        const element = $(id);
+        element.textContent = message;
+        element.style.color = success ? "#15803d" : "#b91c1c";
+      }
 
-  status.textContent = 'جارٍ تحميل الكورسات...';
-  list.replaceChildren();
+      function show(id, visible) {
+        $(id).classList.toggle("hidden", !visible);
+      }
 
-  const { data, error } = await db
-    .from('courses')
-    .select('id, title, description')
-    .eq('is_published', true)
-    .order('title');
+      function clearCourses(message) {
+        const list = $("coursesList");
+        list.replaceChildren();
 
-  if (error) {
-    status.textContent =
-      'تعذر تحميل الكورسات. راجع صلاحيات قاعدة البيانات.';
-    return;
-  }
+        if (message) {
+          const paragraph = document.createElement("p");
+          paragraph.className = "muted";
+          paragraph.textContent = message;
+          list.appendChild(paragraph);
+        }
+      }
 
-  if (!data || data.length === 0) {
-    status.textContent = 'لا توجد كورسات منشورة حاليًا.';
-    return;
-  }
+      $("connectBtn").addEventListener("click", async () => {
+        const url = $("projectUrl").value.trim();
+        const key = $("publicKey").value.trim();
+        const button = $("connectBtn");
 
-  for (const course of data) {
-    const item = document.createElement('li');
-    item.textContent =
-      (course.title || 'كورس') +
-      ' — ' + (course.description || 'بدون وصف');
-    list.appendChild(item);
-  }
+        if (!url || !key) {
+          setStatus("connectionStatus", "أدخل رابط المشروع والمفتاح العام.");
+          return;
+        }
 
-  status.textContent = 'تم تحميل الكورسات.';
-}
+        button.disabled = true;
 
-async function logout() {
-  await db.auth.signOut();
-  show('dashboard', false);
-  show('login', true);
-}
-</script>
+        try {
+          const parsedUrl = new URL(url);
+
+          if (parsedUrl.protocol !== "https:") {
+            throw new Error("رابط المشروع يجب أن يبدأ بـ https://");
+          }
+
+          if (!window.supabase || !window.supabase.createClient) {
+            throw new Error("تعذر تحميل مكتبة Supabase. تحقق من الإنترنت.");
+          }
+
+          const client = window.supabase.createClient(url, key);
+          const { error } = await client.auth.getSession();
+
+          if (error) throw error;
+
+          supabaseClient = client;
+          show("loginCard", true);
+          setStatus(
+            "connectionStatus",
+            "تم إعداد الاتصال. سجّل الدخول للمتابعة.",
+            true
+          );
+        } catch (error) {
+          supabaseClient = null;
+          show("loginCard", false);
+          setStatus(
+            "connectionStatus",
+            error.message || "تعذر إعداد الاتصال."
+          );
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      $("loginForm").addEventListener("submit", async event => {
+        event.preventDefault();
+
+        if (!supabaseClient) {
+          setStatus("loginStatus", "اتصل بقاعدة البيانات أولًا.");
+          return;
+        }
+
+        const email = $("email").value.trim();
+        const password = $("password").value;
+        const button = $("loginBtn");
+
+        button.disabled = true;
+        setStatus("loginStatus", "جارٍ التحقق من الحساب...", true);
+
+        try {
+          const { data, error } =
+            await supabaseClient.auth.signInWithPassword({
+              email,
+              password
+            });
+
+          if (error) throw error;
+
+          const user = data.user;
+
+          if (!user) {
+            throw new Error("لم يتم العثور على حساب المستخدم.");
+          }
+
+          const { data: profile, error: profileError } =
+            await supabaseClient
+              .from("profiles")
+              .select("full_name, role, is_active")
+              .eq("id", user.id)
+              .maybeSingle();
+
+          if (profileError) throw profileError;
+
+          if (!profile) {
+            throw new Error(
+              "لا يوجد ملف شخصي لهذا الحساب في جدول profiles."
+            );
+          }
+
+          if (profile.is_active === false) {
+            throw new Error("الحساب غير نشط. تواصل مع مسؤول المنصة.");
+          }
+
+          if (!["super_admin", "teacher"].includes(profile.role)) {
+            throw new Error("هذا الحساب ليس حساب إدارة أو معلم.");
+          }
+
+          currentUser = user;
+
+          $("userInfo").textContent =
+            "مرحبًا " + (profile.full_name || user.email || "");
+
+          $("roleTag").textContent =
+            profile.role === "super_admin" ? "مدير عام" : "معلم";
+
+          show("loginCard", false);
+          show("dashboard", true);
+          setStatus("loginStatus", "", true);
+          setStatus("dashboardStatus", "تم تسجيل الدخول بنجاح.", true);
+
+          await loadCourses();
+        } catch (error) {
+          if (supabaseClient) {
+            await supabaseClient.auth.signOut().catch(() => {});
+          }
+
+          currentUser = null;
+          show("dashboard", false);
+
+          setStatus(
+            "loginStatus",
+            error.message || "فشل تسجيل الدخول."
+          );
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      async function loadCourses() {
+        if (!supabaseClient || !currentUser) {
+          setStatus("dashboardStatus", "سجّل الدخول أولًا.");
+          return;
+        }
+
+        const button = $("refreshBtn");
+        button.disabled = true;
+        clearCourses("جارٍ تحميل الكورسات...");
+
+        try {
+          const { data, error } = await supabaseClient
+            .from("courses")
+            .select("id, title, description")
+            .eq("is_published", true)
+            .order("title", { ascending: true });
+
+          if (error) throw error;
+
+          clearCourses();
+
+          if (!data || data.length === 0) {
+            clearCourses("لا توجد كورسات منشورة حاليًا.");
+          } else {
+            data.forEach(course => {
+              const article = document.createElement("article");
+              article.className = "course";
+
+              const title = document.createElement("h3");
+              title.textContent = course.title || "كورس بدون عنوان";
+
+              const description = document.createElement("p");
+              description.className = "muted";
+              description.textContent =
+                course.description || "لا يوجد وصف لهذا الكورس.";
+
+              const status = document.createElement("span");
+              status.className = "tag";
+              status.textContent = "منشور";
+
+              article.append(title, description, status);
+              $("coursesList").appendChild(article);
+            });
+          }
+
+          setStatus("dashboardStatus", "تم تحديث قائمة الكورسات.", true);
+        } catch (error) {
+          clearCourses("تعذر تحميل الكورسات.");
+          setStatus(
+            "dashboardStatus",
+            "خطأ في تحميل الكورسات: " +
+              (error.message || "خطأ غير معروف")
+          );
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      $("refreshBtn").addEventListener("click", loadCourses);
+
+      $("logoutBtn").addEventListener("click", async () => {
+        if (!supabaseClient) return;
+
+        const button = $("logoutBtn");
+        button.disabled = true;
+
+        try {
+          const { error } = await supabaseClient.auth.signOut();
+          if (error) throw error;
+
+          currentUser = null;
+          show("dashboard", false);
+          show("loginCard", true);
+          $("password").value = "";
+          clearCourses("سجّل الدخول لعرض الكورسات.");
+          setStatus("loginStatus", "تم تسجيل الخروج.", true);
+        } catch (error) {
+          setStatus(
+            "dashboardStatus",
+            "تعذر تسجيل الخروج: " + (error.message || "")
+          );
+        } finally {
+          button.disabled = false;
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
