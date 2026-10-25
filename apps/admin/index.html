@@ -1,1 +1,203 @@
 
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>منصتك - لوحة الإدارة</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: Tahoma, Arial, sans-serif;
+      background: #f3f6fc;
+      color: #14213d;
+    }
+    header {
+      background: #14213d;
+      color: white;
+      padding: 22px;
+    }
+    main {
+      max-width: 850px;
+      margin: 25px auto;
+      padding: 0 15px;
+    }
+    section {
+      background: white;
+      padding: 20px;
+      margin-bottom: 18px;
+      border-radius: 14px;
+      box-shadow: 0 3px 12px #0000000b;
+    }
+    input {
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: 1px solid #ccd4e0;
+      border-radius: 8px;
+    }
+    button {
+      padding: 12px 18px;
+      border: 0;
+      border-radius: 8px;
+      background: #2457c5;
+      color: white;
+      cursor: pointer;
+    }
+    .hidden { display: none; }
+    .error { color: #b91c1c; }
+    li { padding: 8px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>منصتك التعليمية</h1>
+  <p>لوحة إدارة المشرف والمدرس</p>
+</header>
+
+<main>
+  <section id="setup">
+    <h2>إعداد الاتصال</h2>
+    <p>أدخل رابط مشروع Supabase والمفتاح العام فقط.</p>
+    <input id="url" placeholder="Project URL">
+    <input id="key" placeholder="Publishable أو anon key">
+    <button onclick="connect()">اتصال</button>
+    <p id="setupMessage" class="error"></p>
+  </section>
+
+  <section id="login" class="hidden">
+    <h2>تسجيل الدخول</h2>
+    <input id="email" type="email" placeholder="البريد الإلكتروني">
+    <input id="password" type="password" placeholder="كلمة المرور">
+    <button onclick="signIn()">دخول</button>
+    <p id="loginMessage" class="error"></p>
+  </section>
+
+  <section id="dashboard" class="hidden">
+    <h2 id="welcome">لوحة التحكم</h2>
+    <button onclick="loadCourses()">تحديث الكورسات</button>
+    <button onclick="logout()">تسجيل الخروج</button>
+    <p id="status"></p>
+    <h3>الكورسات المنشورة</h3>
+    <ul id="courses"></ul>
+  </section>
+</main>
+
+<script>
+let db = null;
+
+function show(id, visible) {
+  document.getElementById(id).classList.toggle(
+    'hidden', !visible
+  );
+}
+
+function connect() {
+  const url = document.getElementById('url').value.trim();
+  const key = document.getElementById('key').value.trim();
+
+  if (!url.startsWith('https://') || !key) {
+    document.getElementById('setupMessage').textContent =
+      'راجع رابط المشروع والمفتاح العام.';
+    return;
+  }
+
+  db = window.supabase.createClient(url, key);
+  show('setup', false);
+  show('login', true);
+}
+
+async function signIn() {
+  const message = document.getElementById('loginMessage');
+  message.textContent = 'جارٍ تسجيل الدخول...';
+
+  const { error } = await db.auth.signInWithPassword({
+    email: document.getElementById('email').value.trim(),
+    password: document.getElementById('password').value
+  });
+
+  if (error) {
+    message.textContent = error.message;
+    return;
+  }
+
+  const { data, error: userError } = await db.auth.getUser();
+
+  if (userError || !data.user) {
+    message.textContent = 'تعذر التحقق من الحساب.';
+    return;
+  }
+
+  const { data: profile, error: profileError } = await db
+    .from('profiles')
+    .select('full_name, role, is_active')
+    .eq('id', data.user.id)
+    .maybeSingle();
+
+  if (
+    profileError ||
+    !profile ||
+    !['super_admin', 'teacher'].includes(profile.role) ||
+    profile.is_active === false
+  ) {
+    await db.auth.signOut();
+    message.textContent =
+      'الحساب غير مخوّل لدخول لوحة الإدارة.';
+    return;
+  }
+
+  document.getElementById('welcome').textContent =
+    'أهلًا ' + (profile.full_name || 'بك');
+
+  show('login', false);
+  show('dashboard', true);
+  await loadCourses();
+}
+
+async function loadCourses() {
+  const status = document.getElementById('status');
+  const list = document.getElementById('courses');
+
+  status.textContent = 'جارٍ تحميل الكورسات...';
+  list.replaceChildren();
+
+  const { data, error } = await db
+    .from('courses')
+    .select('id, title, description')
+    .eq('is_published', true)
+    .order('title');
+
+  if (error) {
+    status.textContent =
+      'تعذر تحميل الكورسات. راجع صلاحيات قاعدة البيانات.';
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    status.textContent = 'لا توجد كورسات منشورة حاليًا.';
+    return;
+  }
+
+  for (const course of data) {
+    const item = document.createElement('li');
+    item.textContent =
+      (course.title || 'كورس') +
+      ' — ' + (course.description || 'بدون وصف');
+    list.appendChild(item);
+  }
+
+  status.textContent = 'تم تحميل الكورسات.';
+}
+
+async function logout() {
+  await db.auth.signOut();
+  show('dashboard', false);
+  show('login', true);
+}
+</script>
+</body>
+</html>
