@@ -1,64 +1,67 @@
+
 name: Build Monsatak Android APK
 
 on:
-workflow_dispatch:
-push:
-paths:
-- "apps/student/**"
-- ".github/workflows/build-apk.yml"
+  workflow_dispatch:
+  push:
+    paths:
+      - "apps/student/**"
+      - ".github/workflows/build-apk.yml"
 
 jobs:
-build:
-runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
 
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  - name: Setup Java
-    uses: actions/setup-java@v4
-    with:
-      distribution: temurin
-      java-version: "17"
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
-  - name: Setup Flutter
-    uses: subosito/flutter-action@v2
-    with:
-      channel: stable
-      cache: true
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
 
-  - name: Generate Android project files
-    working-directory: apps/student
-    run: flutter create --platforms=android --org com.monsatak .
+      - name: Generate Android project files
+        working-directory: apps/student
+        run: flutter create --platforms=android --org com.monsatak .
 
-  - name: Get dependencies
-    working-directory: apps/student
-    run: flutter pub get
+      - name: Get dependencies
+        working-directory: apps/student
+        run: flutter pub get
 
-  - name: Build Android APK
-    working-directory: apps/student
-    run: |
-      flutter clean
-      flutter build apk --release \
-        --dart-define="SUPABASE_URL=${{ vars.SUPABASE_URL }}" \
-        --dart-define="SUPABASE_PUBLISHABLE_KEY=${{ vars.SUPABASE_PUBLISHABLE_KEY }}"
+      - name: Build Android APK
+        working-directory: apps/student
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          flutter build apk --release \
+            --dart-define="SUPABASE_URL=$SUPABASE_URL" \
+            --dart-define="SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
 
-  - name: Verify APK
-    working-directory: apps/student
-    shell: bash
-    run: |
-      set -e
-      APK="build/app/outputs/flutter-apk/app-release.apk"
-      test -s "$APK"
-      unzip -t "$APK"
-      APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
-      test -n "$APKSIGNER"
-      "$APKSIGNER" verify --verbose "$APK"
+      - name: Verify APK
+        working-directory: apps/student
+        shell: bash
+        run: |
+          set -e
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$APK"
+          unzip -t "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose "$APK"
 
-  - name: Upload APK
-    uses: actions/upload-artifact@v4
-    with:
-      name: monsatak-student-apk
-      path: apps/student/build/app/outputs/flutter-apk/app-release.apk
-      if-no-files-found: error
-      retention-days: 7
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: monsatak-student-apk
+          path: apps/student/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
