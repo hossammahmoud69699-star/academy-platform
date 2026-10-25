@@ -1,100 +1,81 @@
 name: Build Monsatak Android APK
 
-
-
-
-
-
 on:
-
-
   workflow_dispatch:
-  
   push:
-  
     paths:
-    
       - "apps/student/**"
-      
       - ".github/workflows/build-apk.yml"
-      
-
-
-
 
 jobs:
-
-
   build:
-  
     runs-on: ubuntu-latest
-    
-
-
-
-
     steps:
-    
       - name: Checkout repository
-      
         uses: actions/checkout@v4
-        
-
-
-
-
       - name: Setup Java
-      
         uses: actions/setup-java@v5
-        
         with:
-        
           distribution: temurin
-          
           java-version: "17"
-          
-
-
-
-
       - name: Setup Flutter
-      
         uses: subosito/flutter-action@v2
-        
         with:
-        
           channel: stable
-          
           cache: true
-          
-
-
-
-
       - name: Generate Android project files
-      
         working-directory: apps/student
-        
         run: flutter create --platforms=android --org com.monsatak .
-        
-
-
-
-
       - name: Get dependencies
-      
         working-directory: apps/student
-        
         run: flutter pub get
-        
-
-
-
-
       - name: Build Android APK
-      
         working-directory: apps/student
-        
         run: |
           flutter build apk --release \
-          
+            --dart-define="SUPABASE_URL=\${{ vars.SUPABASE_URL }}" \
+            --dart-define="SUPABASE_PUBLISHABLE_KEY=\${{ vars.SUPABASE_PUBLISHABLE_KEY }}"
+      - name: Create signing key
+        working-directory: apps/student
+        run: |
+          keytool -genkeypair -v \
+            -keystore upload-keystore.jks \
+            -alias upload \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=Monsatak, OU=Student, O=Monsatak, L=Cairo, ST=Cairo, C=EG"
+      - name: Align and sign APK
+        working-directory: apps/student
+        shell: bash
+        run: |
+          set -e
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          zipalign -f 4 "$APK" app-aligned.apk
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks upload-keystore.jks \
+            --ks-key-alias upload \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out app-signed.apk \
+            app-aligned.apk
+          mv app-signed.apk "$APK"
+          "$BUILD_TOOLS/apksigner" verify --verbose "$APK"
+      - name: Verify APK
+        working-directory: apps/student
+        shell: bash
+        run: |
+          set -e
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$APK"
+          unzip -t "$APK"
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: monsatak-student-apk-signed
+          path: apps/student/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
