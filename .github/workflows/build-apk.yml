@@ -1,11 +1,13 @@
 name: Build Monsatak Android APK
 
+
 on:
   workflow_dispatch:
   push:
     paths:
       - "apps/student/**"
       - ".github/workflows/build-apk.yml"
+
 
 jobs:
   build:
@@ -33,8 +35,8 @@ jobs:
         working-directory: apps/student
         run: |
           flutter build apk --release \
-            --dart-define="SUPABASE_URL=\${{ vars.SUPABASE_URL }}" \
-            --dart-define="SUPABASE_PUBLISHABLE_KEY=\${{ vars.SUPABASE_PUBLISHABLE_KEY }}"
+            --dart-define="SUPABASE_URL=${{ vars.SUPABASE_URL }}" \
+            --dart-define="SUPABASE_PUBLISHABLE_KEY=${{ vars.SUPABASE_PUBLISHABLE_KEY }}"
       - name: Create signing key
         working-directory: apps/student
         run: |
@@ -79,3 +81,4 @@ jobs:
           path: apps/student/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 7
+
