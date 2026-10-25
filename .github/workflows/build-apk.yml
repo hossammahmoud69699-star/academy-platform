@@ -1,5 +1,4 @@
 
-
 name: Build Monsatak Android APK
 
 on:
@@ -33,16 +32,18 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Check Flutter project
+      - name: Generate Android project files
         run: |
-          flutter --version
-          flutter pub get
+          flutter create --platforms=android --org com.monsatak .
+          
+      - name: Get dependencies
+        run: flutter pub get
 
       - name: Build Android APK
         run: |
           flutter build apk --release \
-            --dart-define=SUPABASE_URL=${{ vars.SUPABASE_URL }} \
-            --dart-define=SUPABASE_PUBLISHABLE_KEY=${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+            --dart-define=SUPABASE_URL="${{ vars.SUPABASE_URL }}" \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY="${{ vars.SUPABASE_PUBLISHABLE_KEY }}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
